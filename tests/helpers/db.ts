@@ -24,7 +24,7 @@ export async function resetDb(): Promise<void> {
       webhook_deliveries, webhook_endpoints, webhook_events,
       idempotency_keys, api_keys, audit_logs, notifications, support_tickets,
       invitations, memberships, organizations, verification_tokens, sessions, users,
-      rate_limits, platform_settings
+      mfa_challenges, rate_limits, platform_settings
     restart identity cascade
   `);
 }

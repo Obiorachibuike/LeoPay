@@ -9,8 +9,12 @@ import { Badge, StatusBadge } from "@/components/ui/badge";
 import { PasswordForm } from "@/components/dashboard/settings-forms";
 import { BusinessDetailsForm, PayoutPolicyForm } from "@/components/dashboard/organization-forms";
 import { VerifyEmailPanel } from "@/components/dashboard/verify-email-panel";
+import { MfaPanel } from "@/components/dashboard/mfa-panel";
+import { AvatarUploadForm, LogoUploadForm } from "@/components/dashboard/profile-forms";
+import { remainingRecoveryCodes } from "@/services/mfa";
 import { ActionButton } from "@/components/ui/action-button";
 import { requestVerificationAction } from "@/app/actions/organization";
+import { setMfaPolicyAction } from "@/app/actions/mfa";
 
 export default async function SettingsPage() {
   const ctx = await requireOrgContext();
@@ -56,6 +60,14 @@ export default async function SettingsPage() {
               </div>
             </Alert>
           ) : null}
+          <div className="rounded-lg border border-border bg-surface-2/30 p-3">
+            <p className="mb-3 text-[13px] font-medium">Workspace logo</p>
+            {canManage ? (
+              <LogoUploadForm logoUrl={ctx.organization.logoUrl} name={ctx.organization.name} />
+            ) : (
+              <p className="text-[12px] text-muted">Only owners and admins can change the workspace logo.</p>
+            )}
+          </div>
           <BusinessDetailsForm organization={ctx.organization} />
         </CardBody>
       </Card>
@@ -112,6 +124,48 @@ export default async function SettingsPage() {
             </Badge>
           </div>
           {!ctx.user.emailVerifiedAt ? <VerifyEmailPanel email={ctx.user.email} /> : null}
+          <div className="border-t border-border pt-4">
+            <p className="mb-3 text-[13px] font-medium">Profile photo</p>
+            <AvatarUploadForm avatarUrl={ctx.user.avatarUrl} name={ctx.user.name} />
+          </div>
+          <div className="border-t border-border pt-4">
+            <p className="mb-3 text-[13px] font-medium">Two-factor authentication</p>
+            <MfaPanel
+              enabled={ctx.user.mfaEnabled}
+              remainingRecoveryCodes={remainingRecoveryCodes(ctx.user)}
+              email={ctx.user.email}
+            />
+          </div>
+          <div className="border-t border-border pt-4">
+            <p className="mb-1 text-[13px] font-medium">Workspace MFA policy</p>
+            <p className="mb-2 max-w-lg text-[11.5px] leading-relaxed text-muted">
+              When on, owners and admins must have two-factor authentication enabled before they can change workspace
+              settings, manage the team, approve payouts or create API keys. Sensitive actions are refused on the server,
+              not merely hidden.
+            </p>
+            <div className="flex flex-wrap items-center gap-2 text-[12.5px]">
+              <Badge tone={ctx.organization.requireMfaForAdmins ? "success" : "neutral"}>
+                {ctx.organization.requireMfaForAdmins ? "required for owners and admins" : "optional"}
+              </Badge>
+              {env.requireMfaForAdmins ? <Badge tone="accent">enforced by platform policy</Badge> : null}
+            </div>
+            {canManage ? (
+              ctx.user.mfaEnabled ? (
+                <div className="mt-3">
+                  <ActionButton action={setMfaPolicyAction.bind(null, !ctx.organization.requireMfaForAdmins)}>
+                    {ctx.organization.requireMfaForAdmins ? "Make MFA optional" : "Require MFA for owners and admins"}
+                  </ActionButton>
+                </div>
+              ) : (
+                <p className="mt-2 text-[11.5px] text-muted">
+                  Enable two-factor authentication on your own account first — you cannot require a control you do not
+                  use yourself.
+                </p>
+              )
+            ) : (
+              <p className="mt-2 text-[11.5px] text-muted">Only owners and admins can change this policy.</p>
+            )}
+          </div>
           <div className="max-w-sm border-t border-border pt-4">
             <p className="mb-3 text-[13px] font-medium">Change password</p>
             <PasswordForm />

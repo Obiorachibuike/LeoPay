@@ -14,18 +14,20 @@ A production-oriented, multi-tenant business payments platform for Nigerian busi
 | --- | --- |
 | Marketing site (home, features, solutions, pricing, security, developers, docs, about, contact, legal, status) | Implemented |
 | Authentication (register, login, email verification, password reset, invitations), sessions, rate limits | Implemented |
+| Two-factor authentication (TOTP, QR enrolment, single-use recovery codes) + workspace MFA policy for owners/admins | Implemented |
 | Multi-tenant organizations, roles (owner/admin/finance/developer/viewer), audit log | Implemented |
 | Payment links + hosted checkout + public payment page | Implemented |
 | Payments: provider initialization, server-side verification, refunds, reconciliation | Implemented |
 | Invoices: line items, tax, discounts, PDF, email, reminders, overdue tracking | Implemented |
 | Storefront, products, inventory reservations, orders | Implemented |
+| Image uploads: product photos, workspace logo, profile photo (validated, content-addressed, served from the app) | Implemented |
 | Payouts: beneficiaries, account resolution, approval threshold, separation of duties, daily limits | Implemented |
 | Transactions, analytics, CSV export, ledger, reconciliation exceptions | Implemented |
 | Developer API v1 (scoped keys, idempotency), signed merchant webhooks with retry outbox | Implemented |
 | Provider webhook receiver, scheduled job endpoint, platform admin console | Implemented |
 | Mock payment provider for local end-to-end flows (blocked in production) | Implemented, clearly labelled |
-| Live provider adapter (Paystack) | Implemented against the public API; **not tested against live credentials here** |
-| Automated tests | 56 integration/unit tests (see `docs/TESTING.md`) |
+| Live provider adapter (Paystack) | Implemented against the public API and covered by recorded-response contract tests; **not tested against live credentials here** |
+| Automated tests | 110 integration/unit/contract tests (see `docs/TESTING.md`) |
 
 Nothing in the UI is a dead button: every action calls a server action or route handler that re-authorizes, validates and persists.
 

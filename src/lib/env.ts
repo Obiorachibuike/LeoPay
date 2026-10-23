@@ -44,6 +44,16 @@ export const env = {
   storageBucket: process.env.STORAGE_BUCKET ?? "",
   storageAccessKeyId: process.env.STORAGE_ACCESS_KEY_ID ?? "",
   storageSecretAccessKey: process.env.STORAGE_SECRET_ACCESS_KEY ?? "",
+  /**
+   * Where merchant images are written when no object-storage driver is
+   * configured. Must be a persistent volume in production.
+   */
+  uploadDir: process.env.UPLOAD_DIR ?? ".data/uploads",
+  /**
+   * Platform-wide floor: force owners/admins to enrol in MFA before they can
+   * perform sensitive actions. Organizations can opt in on their own too.
+   */
+  requireMfaForAdmins: bool(process.env.REQUIRE_MFA_FOR_ADMINS, false),
   webhookEncryptionKey: process.env.WEBHOOK_ENCRYPTION_KEY ?? "",
   logLevel: process.env.LOG_LEVEL ?? "info",
   /** Enables an in-process job ticker for webhooks/notifications (dev/single-node). */
@@ -133,7 +143,20 @@ export function checkRuntimeConfig(): RuntimeConfigProblem[] {
     });
   }
 
+  if (isProduction && !pathIsAbsolute(env.uploadDir)) {
+    problems.push({
+      variable: "UPLOAD_DIR",
+      message:
+        "UPLOAD_DIR should be an absolute path on a persistent volume in production; a relative path may not survive deploys.",
+      fatal: false,
+    });
+  }
+
   return problems;
+}
+
+function pathIsAbsolute(value: string): boolean {
+  return value.startsWith("/") || /^[A-Za-z]:[\\/]/.test(value);
 }
 
 /** Throws when a fatal production misconfiguration is detected. */

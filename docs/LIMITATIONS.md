@@ -4,22 +4,23 @@ Stated plainly, so nothing here is mistaken for production-hardened capability.
 
 ## Provider integration
 
-- The Paystack adapter (`src/lib/providers/paystack.ts`) is written against the public API (initialize, verify, refund, banks, account resolve, transfers, signature verification) but **has not been executed against live credentials** in this environment. Treat it as untested until you have run it with test keys in a staging deployment.
+- The Paystack adapter (`src/lib/providers/paystack.ts`) is written against the public API (initialize, verify, refund, banks, account resolve, transfers, signature verification) and is covered by contract tests that replay recorded request/response shapes through a stubbed `fetch` (`tests/paystack-contract.test.ts`, fixtures in `tests/fixtures/paystack/`). Those tests prove our side of the contract, **not** that the live API still behaves the same way: it has not been executed against live credentials in this environment. Run it with test keys in staging and refresh the fixtures before go-live.
 - Only Paystack and the development mock provider are implemented. Flutterwave/Monnify environment variables exist in `env.ts` but no adapter is written; selecting them is not supported.
 - Provider fees are taken from the provider's verification response when present. Where the provider does not return a fee, `fee_minor` is `null` and net is not invented.
 - Reconciliation re-verifies in-flight payments; it does not download a provider settlement report.
 
 ## Platform features not built
 
-- No subscription/plan billing for LeoPay itself (`PLATFORM_FEE_BPS=0`; pricing is explicitly indicative).
-- No file uploads — product images and logos are URLs.
+- No subscription/plan billing for LeoPay itself (`PLATFORM_FEE_BPS=0`; pricing is explicitly indicative). There is no plan catalogue, metering or recurring charge for the platform's own fees.
+- Uploads are local-disk only (`UPLOAD_DIR`, default `.data/uploads`). There is no S3/R2 driver, CDN, image resizing, orphan cleanup or deletion when a product/logo/avatar is replaced; a multi-node deployment needs shared storage before this is usable.
+- No dispute/chargeback workflow: refunds are implemented, but provider disputes are not ingested, tracked or evidenced in the app.
 - No automated KYC/document checks; business verification is a manual admin decision.
-- No MFA/TOTP, no social login, no SCIM.
+- MFA is TOTP-only (no WebAuthn/passkeys, SMS or SSO), there is no social login and no SCIM. The workspace MFA policy gates sensitive permissions rather than every page view.
 - No multi-currency conversion; each organization has a default currency and payments store their own currency.
 - No partial-invoice payment across multiple payments beyond the outstanding balance logic already implemented (a second payment can be created for the remainder, but the UI exposes the full outstanding amount only).
-- No refund UI for partial amounts beyond the implemented form fields; no dispute/chargeback workflow.
+- No refund UI for partial amounts beyond the implemented form fields.
 - Reports: transactions, method breakdown, daily collections and ledger summary only (no exportable P&L).
-- No browser end-to-end test suite (no browser runtime available here).
+- No browser end-to-end test suite. Playwright's browser downloads are blocked in this environment (the CDN is unreachable), so browser tests could not be written *and verified*; the HTTP-level smoke tests in `docs/TESTING.md` are the substitute. Wiring Playwright is a one-command follow-up where browsers can be installed.
 
 ## Environment constraints
 

@@ -29,8 +29,37 @@ export const currencySchema = z
   .refine((code) => CURRENCIES[code as keyof typeof CURRENCIES].enabled, "This currency is not enabled")
   .transform((code) => code.toUpperCase());
 
+/**
+ * Absolute URL limited to http(s). `z.string().url()` alone also accepts
+ * schemes like `javascript:` — which would become a stored-XSS link wherever
+ * the value is rendered.
+ */
+export const httpUrlSchema = z
+  .string()
+  .trim()
+  .url("Enter a valid URL")
+  .refine((value) => /^https?:\/\//i.test(value), "Enter an http:// or https:// URL");
+
 export const optionalUrlSchema = z
-  .union([z.string().trim().url("Enter a valid URL"), z.literal(""), z.null()])
+  .union([httpUrlSchema, z.literal(""), z.null()])
+  .optional()
+  .transform((v) => (v ? v : null));
+
+/**
+ * An image reference may be an external https URL or a file this app stored
+ * itself (`/api/uploads/<org>/<kind>/<sha256>.<ext>`). The strict pattern stops
+ * a form from pointing the app at an arbitrary same-origin path.
+ */
+export const uploadedImagePathSchema = z
+  .string()
+  .trim()
+  .regex(
+    /^\/api\/uploads\/[0-9a-f-]{36}\/(product|logo|avatar)\/[a-f0-9]{64}\.(png|jpg|webp|gif)$/,
+    "Upload a valid image",
+  );
+
+export const imageRefSchema = z
+  .union([httpUrlSchema, uploadedImagePathSchema, z.literal(""), z.null()])
   .optional()
   .transform((v) => (v ? v : null));
 
@@ -111,6 +140,7 @@ export const organizationSchema = z.object({
 });
 
 export const businessDetailsSchema = organizationSchema.partial().extend({
+  logoUrl: imageRefSchema,
   settlementBankName: z.string().trim().max(120).optional(),
   settlementAccountName: z.string().trim().max(160).optional(),
   settlementAccountNumber: z
@@ -190,7 +220,7 @@ export const productSchema = z.object({
   trackInventory: z.boolean().default(false),
   inventoryQuantity: z.number().int().min(0).max(1_000_000).default(0),
   status: z.enum(["draft", "active", "archived"]).default("draft"),
-  imageUrl: optionalUrlSchema,
+  imageUrl: imageRefSchema,
 });
 
 export const storefrontSchema = z.object({

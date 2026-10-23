@@ -1,0 +1,9 @@
+{
+  "status": true,
+  "message": "Transfer retrieved",
+  "data": {
+    "reference": "LPPO_0001",
+    "status": "success",
+    "failures": null
+  }
+}

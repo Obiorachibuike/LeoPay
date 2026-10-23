@@ -34,10 +34,10 @@ Rules the codebase follows:
 4. **Queues live in the database.** Emails and merchant webhooks are persisted rows; nothing important is held in memory.
 5. **Provider calls happen outside long transactions** wherever possible, and always outside `FOR UPDATE` locks.
 
-## Data model (37 tables)
+## Data model (38 tables)
 
 Identity & access
-: `users`, `sessions`, `verification_tokens`, `organizations`, `memberships`, `invitations`, `api_keys`, `rate_limits`, `audit_logs`
+: `users`, `sessions`, `verification_tokens`, `mfa_challenges`, `organizations`, `memberships`, `invitations`, `api_keys`, `rate_limits`, `audit_logs`
 
 Money in
 : `customers`, `payment_links`, `payments`, `refunds`, `invoices`, `invoice_items`, `invoice_sequences`
@@ -56,6 +56,16 @@ Reliability
 
 Operations
 : `reconciliation_runs`, `reconciliation_exceptions`, `platform_settings`, `support_tickets`, `mock_checkout_sessions` (development only)
+
+### Uploads
+
+Merchant images (product photos, workspace logos, profile photos) are written by
+`src/lib/storage.ts` to `UPLOAD_DIR` (default `.data/uploads`) under
+`<organizationId>/<kind>/<sha256>.<ext>` and served by
+`GET /api/uploads/[...key]`. Keys are content-addressed, so the same bytes are
+stored once, and the file extension comes from sniffed magic bytes rather than
+the upload's filename. Swapping in object storage means reimplementing
+`putImage`/`readImage`; callers never touch the filesystem.
 
 ### Tenancy
 

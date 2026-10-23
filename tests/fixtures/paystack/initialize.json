@@ -1,0 +1,9 @@
+{
+  "status": true,
+  "message": "Authorization URL created",
+  "data": {
+    "authorization_url": "https://checkout.paystack.com/example-access-code",
+    "access_code": "example_access_code",
+    "reference": "LPPAY_0001"
+  }
+}

@@ -87,11 +87,38 @@ export const users = pgTable(
     status: text("status").notNull().default("active"), // active | suspended
     platformRole: text("platform_role").notNull().default("user"), // user | admin
     mfaEnabled: boolean("mfa_enabled").notNull().default(false),
+    /** AES-GCM encrypted TOTP secret; present while enrolled or mid-enrollment. */
+    mfaSecretEncrypted: text("mfa_secret_encrypted"),
+    mfaEnabledAt: timestamp("mfa_enabled_at", { withTimezone: true }),
+    /** SHA-256 hashes of unused recovery codes. */
+    mfaRecoveryCodeHashes: text("mfa_recovery_code_hashes").array().notNull().default(sql`ARRAY[]::text[]`),
     lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [uniqueIndex("users_email_unique").on(sql`lower(${t.email})`)],
+);
+
+/**
+ * Short-lived second-factor challenges issued after a correct password but
+ * before a session exists. Tokens are stored hashed, single use, and limited in
+ * both lifetime and attempts.
+ */
+export const mfaChallenges = pgTable(
+  "mfa_challenges",
+  {
+    id: id(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull().unique(),
+    attempts: integer("attempts").notNull().default(0),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    ip: text("ip"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("mfa_challenges_user_idx").on(t.userId), index("mfa_challenges_expiry_idx").on(t.expiresAt)],
 );
 
 export const sessions = pgTable(
@@ -140,6 +167,10 @@ export const organizations = pgTable(
     defaultCurrency: text("default_currency").notNull().default("NGN"),
     businessType: text("business_type"), // sole_proprietorship | limited_company | freelancer | ngo | other
     website: text("website"),
+    /** Merchant-uploaded logo, served from /api/uploads/<org>/logo/<hash>.<ext>. */
+    logoUrl: text("logo_url"),
+    /** When true, owners/admins must have MFA on before sensitive actions. */
+    requireMfaForAdmins: boolean("require_mfa_for_admins").notNull().default(false),
     settlementBankName: text("settlement_bank_name"),
     settlementAccountName: text("settlement_account_name"),
     settlementAccountNumberLast4: text("settlement_account_number_last4"),

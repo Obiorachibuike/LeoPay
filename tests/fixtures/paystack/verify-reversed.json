@@ -1,0 +1,16 @@
+{
+  "status": true,
+  "message": "Verification successful",
+  "data": {
+    "id": 302963,
+    "status": "reversed",
+    "reference": "LPPAY_0003",
+    "amount": 500000,
+    "currency": "NGN",
+    "channel": "bank_transfer",
+    "fees": 0,
+    "paid_at": "2026-02-11T10:00:00.000Z",
+    "gateway_response": "Reversed by bank",
+    "status_reason": "reversed"
+  }
+}

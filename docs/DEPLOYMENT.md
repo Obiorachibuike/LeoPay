@@ -28,6 +28,8 @@ Copy `.env.example` and set at minimum:
 | `EMAIL_API_KEY` | the API key from your email provider dashboard |
 | `JOB_RUNNER_TOKEN` | a long random value shared with your scheduler |
 | `ENABLE_INLINE_JOBS` | `false` |
+| `UPLOAD_DIR` | an absolute path on a **persistent volume** (default `.data/uploads`) |
+| `REQUIRE_MFA_FOR_ADMINS` | `true` recommended: refuse sensitive actions for owners/admins without MFA |
 
 Copy `.env.example` to `.env.local` (or your platform's environment settings) and fill in the
 values; no secret is stored in this repository.
@@ -44,6 +46,16 @@ npm run start
 ```
 
 Run migrations as a separate release step, before new instances receive traffic. Migrations are additive by convention; financial tables are never rewritten in place.
+
+### Uploads
+
+Product photos, logos and avatars are written to `UPLOAD_DIR` and served from
+`/api/uploads/...`. On a container platform the directory must be a mounted
+volume shared by every instance, otherwise an image uploaded on one node 404s on
+another. There is no object-storage driver yet; if you need S3/R2, implement
+`putImage`/`readImage` in `src/lib/storage.ts` and keep the key format. The
+directory is not served statically by Next.js, so no web-server rewrite is
+needed. Back it up together with the database: rows reference files by key.
 
 ## 3. Provider setup
 

@@ -1,0 +1,9 @@
+{
+  "status": true,
+  "message": "Transfer recipient created",
+  "data": {
+    "recipient_code": "RCP_example0001",
+    "type": "nuban",
+    "currency": "NGN"
+  }
+}

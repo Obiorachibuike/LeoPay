@@ -5,7 +5,15 @@ import { loginSchema, registerSchema, resetPasswordSchema, resetRequestSchema } 
 import { login, logout, registerUser, requestPasswordReset, resetPassword, verifyEmailToken, issueEmailVerification } from "@/services/auth";
 import { toErrorResponse, fieldErrorsApp } from "@/lib/actions";
 import { enforceRateLimit } from "@/lib/rate-limit";
-import { requestMeta, getSession } from "@/lib/auth/session";
+import {
+  requestMeta,
+  getSession,
+  setMfaChallengeCookie,
+  readMfaChallengeCookie,
+  clearMfaChallengeCookie,
+} from "@/lib/auth/session";
+import { completeMfaChallenge, createMfaChallenge } from "@/services/mfa";
+import { completeLogin } from "@/services/auth";
 import { acceptInvitation } from "@/services/organizations";
 import { queueEmail } from "@/services/notifications";
 import { db } from "@/lib/db/client";
@@ -61,12 +69,54 @@ export async function loginAction(_prev: FormState, formData: FormData): Promise
 
   try {
     const meta = await requestMeta();
-    await login({ ...parsed.data, ip: meta.ip });
+    const result = await login({ ...parsed.data, ip: meta.ip });
+    if (result.mfaRequired) {
+      const token = await createMfaChallenge({ userId: result.user.id, ip: meta.ip });
+      await setMfaChallengeCookie(token);
+      return {
+        ok: true,
+        message: "Enter the 6-digit code from your authenticator app.",
+        redirectTo: `/login?step=mfa&redirectTo=${encodeURIComponent(safeRedirect(formData.get("redirectTo")))}`,
+      };
+    }
     return { ok: true, message: "Signed in", redirectTo: safeRedirect(formData.get("redirectTo")) };
   } catch (error) {
     const response = toErrorResponse(error);
     return { ok: false, message: response.message };
   }
+}
+
+/**
+ * Second step of sign-in. A session is created only after the TOTP or recovery
+ * code is verified against the pending challenge.
+ */
+export async function verifyMfaLoginAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const token = await readMfaChallengeCookie();
+  const code = String(formData.get("code") ?? "").trim();
+  const redirectTo = safeRedirect(formData.get("redirectTo"));
+
+  if (!token) {
+    return { ok: false, message: "Your sign-in attempt expired. Start again.", redirectTo: "/login" };
+  }
+  if (!/^[0-9a-zA-Z-]{6,20}$/.test(code)) {
+    return { ok: false, message: "Enter the 6-digit code from your authenticator app, or a recovery code." };
+  }
+
+  try {
+    const user = await completeMfaChallenge({ token, code });
+    await clearMfaChallengeCookie();
+    await completeLogin(user);
+    return { ok: true, message: "Signed in", redirectTo };
+  } catch (error) {
+    const response = toErrorResponse(error);
+    return { ok: false, message: response.message };
+  }
+}
+
+/** Abandons a pending second-factor challenge. */
+export async function cancelMfaLoginAction(): Promise<void> {
+  await clearMfaChallengeCookie();
+  redirect("/login");
 }
 
 export async function logoutAction(): Promise<void> {

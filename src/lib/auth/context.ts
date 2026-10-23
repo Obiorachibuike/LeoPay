@@ -4,6 +4,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { memberships, organizations, type Membership, type Organization, type User } from "@/lib/db/schema";
 import { AppError, forbidden, unauthenticated } from "@/lib/errors";
+import { env } from "@/lib/env";
 import { hasPermission, permissionsFor, type Permission, type Role, isRole } from "@/lib/auth/rbac";
 import { getActiveOrganizationId, getSession } from "@/lib/auth/session";
 
@@ -84,11 +85,37 @@ export async function requireOrgContext(orgSlug?: string): Promise<OrgContext> {
   return ctx;
 }
 
+/**
+ * Actions that can move money, change who has access, or mint credentials.
+ * Owners/admins must have MFA enabled to perform them when the organization
+ * (or the platform) has turned the policy on.
+ */
+export const MFA_GATED_PERMISSIONS: readonly Permission[] = [
+  "org:manage",
+  "member:manage",
+  "payout:approve",
+  "developer:manage",
+];
+
+/** True when this user must enrol in MFA before performing gated actions. */
+export function mfaRequiredFor(ctx: Pick<OrgContext, "user" | "organization" | "role">): boolean {
+  if (ctx.user.mfaEnabled) return false;
+  if (ctx.role !== "owner" && ctx.role !== "admin") return false;
+  return env.requireMfaForAdmins || ctx.organization.requireMfaForAdmins;
+}
+
 /** Requires a specific permission within the active organization. */
 export async function requirePermission(permission: Permission, orgSlug?: string): Promise<OrgContext> {
   const ctx = await requireOrgContext(orgSlug);
   if (!hasPermission(ctx.role, permission)) {
     throw forbidden(`Your role (${ctx.role}) cannot perform this action`);
+  }
+  if (MFA_GATED_PERMISSIONS.includes(permission) && mfaRequiredFor(ctx)) {
+    throw new AppError(
+      "FORBIDDEN",
+      "Two-factor authentication is required for this action in your workspace. Enable it in Settings → Security, then try again.",
+      { status: 403, expose: true },
+    );
   }
   return ctx;
 }

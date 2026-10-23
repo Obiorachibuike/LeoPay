@@ -95,9 +95,39 @@ export function ProductForm({ product }: { product?: Product }) {
           </Select>
         </Field>
       </div>
-      <Field label="Image URL" htmlFor={`p-img-${product?.id ?? "new"}`} optional error={state.errors?.imageUrl} hint="Use a hosted image URL. Uploads require object storage configuration.">
-        <Input id={`p-img-${product?.id ?? "new"}`} name="imageUrl" type="url" defaultValue={product?.imageUrl ?? ""} placeholder="https://…" />
-      </Field>
+      {product?.imageUrl ? (
+        <div className="flex items-center gap-3">
+          {/* Merchant-supplied image; rendered from our own upload route or an https URL. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={product.imageUrl} alt="" className="h-14 w-14 rounded-lg border border-border object-cover" />
+          <p className="text-[11.5px] text-muted">Current image. Upload a new file to replace it.</p>
+        </div>
+      ) : null}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field
+          label="Product photo"
+          htmlFor={`p-file-${product?.id ?? "new"}`}
+          optional
+          error={state.errors?.imageUrl}
+          hint="PNG, JPEG, WebP or GIF up to 4 MB."
+        >
+          <Input
+            id={`p-file-${product?.id ?? "new"}`}
+            name="imageFile"
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            className="file:mr-3 file:rounded-md file:border-0 file:bg-surface-2 file:px-3 file:py-1.5 file:text-[12px] file:text-foreground"
+          />
+        </Field>
+        <Field
+          label="…or an image URL"
+          htmlFor={`p-img-${product?.id ?? "new"}`}
+          optional
+          hint="A file upload takes priority over this field."
+        >
+          <Input id={`p-img-${product?.id ?? "new"}`} name="imageUrl" type="url" defaultValue={product?.imageUrl ?? ""} placeholder="https://…" />
+        </Field>
+      </div>
       <div className="rounded-lg border border-border bg-surface-2/40 p-3">
         <label className="flex items-start gap-2.5 text-[13px]">
           <Checkbox name="trackInventory" defaultChecked={product?.trackInventory ?? false} />
