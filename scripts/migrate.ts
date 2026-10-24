@@ -1,12 +1,14 @@
 /**
  * Applies database migrations. Usage: npm run db:migrate
  */
-import { db, closeDb } from "../src/lib/db/client";
+import "./load-env";
+import { db, closeDb, describeDatabase } from "../src/lib/db/client";
 import { runMigrations } from "../src/lib/db/migrate";
 import { env } from "../src/lib/env";
 
 async function main() {
-  console.log(`Applying migrations using driver: ${env.dbDriver}`);
+  const target = describeDatabase();
+  console.log(`Applying migrations to ${target.driver} ${target.target}`);
   await runMigrations(db);
   console.log("Migrations applied successfully.");
   await closeDb();

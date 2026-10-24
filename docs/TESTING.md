@@ -1,13 +1,19 @@
 # Testing
 
 ```bash
-npm test              # unit + integration (PGlite)
-npm run typecheck     # TypeScript
-npm run lint          # ESLint
-npm run build         # production build (includes type checking)
+npm run db:up                                       # PostgreSQL 16 (docker compose)
+TEST_DATABASE_URL=postgresql://leopay:leopay@localhost:5432/leopay_test npm test
+npm run test:db                                     # same thing, short form
+npm run typecheck                                   # TypeScript
+npm run lint                                        # ESLint
+npm run build                                       # production build (includes type checking)
 ```
 
-Tests run against an in-memory PGlite instance with the real migrations applied, so SQL, constraints, transactions and `FOR UPDATE` behave as they do in production.
+Tests run against PostgreSQL with the real migrations applied, so constraints, transactions, `FOR UPDATE` and `SKIP LOCKED` behave exactly as they do in production. The suite truncates the tables it touches between tests, so `TEST_DATABASE_URL` must point at a disposable database (`leopay_test`, created automatically by `db/local-init.sql`).
+
+The suite reads `.env.local` too, so exporting `TEST_DATABASE_URL` there is enough. As a safety rail it refuses to run when the target database name does not contain "test" (override with `ALLOW_NON_TEST_DATABASE=1` only if you really mean it) — the tests truncate tables.
+
+If `TEST_DATABASE_URL` is not set, the suite falls back to in-memory PGlite — the same PostgreSQL engine compiled to WASM — and prints a notice. The fallback keeps `npm test` working without a server, but it is a single connection: use `npm run test:db` when you care about pooling or concurrency.
 
 ## Coverage
 

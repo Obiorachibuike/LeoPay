@@ -21,6 +21,10 @@ export async function register() {
     }
   }
 
+  const { describeDatabase } = await import("@/lib/db/client");
+  const database = describeDatabase();
+  logger.info("Database configured", { driver: database.driver, target: database.target });
+
   if (env.enableInlineJobs) {
     const { startInlineJobRunner } = await import("@/services/jobs");
     startInlineJobRunner();

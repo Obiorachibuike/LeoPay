@@ -6,6 +6,7 @@
  * provider and are always tagged provider="mock"; nothing here pretends to be
  * live money. Refuses to run in production unless ALLOW_SEED=true.
  */
+import "./load-env";
 import { randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db/client";

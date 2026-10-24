@@ -3,7 +3,7 @@
 ## Requirements
 
 - Node.js 20+ (developed on Node 22)
-- PostgreSQL 14+ (managed: Neon, Supabase, RDS, Cloud SQL). PGlite is **not** a production database.
+- PostgreSQL 14+ (managed: Neon, Supabase, RDS, Cloud SQL; developed against PostgreSQL 16). For local development `docker-compose.yml` starts one with `npm run db:up`.
 - A payment provider account (Paystack) to accept real payments.
 - An email provider (Resend) to deliver real email; otherwise messages are recorded but not sent.
 - An HTTPS hostname, and a scheduler that can call `POST /api/cron`.
@@ -16,8 +16,8 @@ Copy `.env.example` and set at minimum:
 | --- | --- |
 | `NODE_ENV` | `production` |
 | `NEXT_PUBLIC_APP_URL` | your HTTPS origin |
-| `DATABASE_URL` | your managed PostgreSQL connection string |
-| `DB_DRIVER` | `postgres` |
+| `DATABASE_URL` | your managed PostgreSQL connection string (add `?sslmode=require`) |
+| `DB_DRIVER` | `postgres` (the only value a deployment should use) |
 | `AUTH_SECRET` | 48 random bytes, e.g. from `openssl rand -base64 48` |
 | `WEBHOOK_ENCRYPTION_KEY` | 48 random bytes, generated the same way |
 | `PAYMENT_PROVIDER` | `paystack` |
@@ -94,4 +94,4 @@ Deploy the previous build; migrations are additive so the old code continues to 
 
 - The app is stateless; run multiple instances behind a load balancer.
 - Set `ENABLE_INLINE_JOBS=false` and use the scheduler when running more than one instance (the outbox uses `SKIP LOCKED`, so duplicates are avoided, but centralising jobs makes behaviour predictable).
-- PGlite cannot be shared between processes — local development only.
+- Run migrations as a separate release step (`npm run db:migrate`) while the pool is idle; they are additive, and instances serve traffic against both schema versions during a rolling deploy.

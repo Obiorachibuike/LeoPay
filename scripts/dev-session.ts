@@ -6,6 +6,7 @@
  *
  * It writes a real, revocable session row — never use this against production.
  */
+import "./load-env";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { users } from "@/lib/db/schema";
