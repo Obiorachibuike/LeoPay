@@ -161,7 +161,14 @@ export async function getOverviewMetrics(input: {
 
 export type TimeseriesPoint = { date: string; collectedMinor: number; successfulCount: number };
 
-/** Daily collections series. Uses generate_series so empty days appear as zero. */
+/**
+ * Daily collections series. Uses generate_series so empty days appear as zero.
+ *
+ * Timestamps are bound as ISO strings with an explicit cast: postgres.js only
+ * serialises `Date` values inside its own query builder, so a `Date` bound into
+ * a raw `sql` template would be handled by Node's Buffer conversion instead.
+ * PGlite accepted it; a real PostgreSQL server does not.
+ */
 export async function getCollectionsTimeseries(input: {
   organizationId: string;
   currency: string;
@@ -171,8 +178,8 @@ export async function getCollectionsTimeseries(input: {
   const rows = await db.execute<{ day: string; collected: string; successes: string }>(sql`
     with days as (
       select generate_series(
-        date_trunc('day', ${input.from}::timestamptz),
-        date_trunc('day', ${input.to}::timestamptz),
+        date_trunc('day', ${input.from.toISOString()}::timestamptz),
+        date_trunc('day', ${input.to.toISOString()}::timestamptz),
         interval '1 day'
       ) as day
     )

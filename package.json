@@ -11,8 +11,12 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:db": "TEST_DATABASE_URL=postgresql://leopay@localhost:5432/leopay_test vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --conditions=react-server scripts/migrate.ts",
+    "db:up": "docker compose up -d --wait db",
+    "db:down": "docker compose down",
+    "db:reset": "docker compose down -v && docker compose up -d --wait db && npm run db:migrate",
     "db:seed": "tsx --conditions=react-server scripts/seed.ts",
     "check": "npm run typecheck && npm run lint && npm run test",
     "dev:session": "tsx --conditions=react-server scripts/dev-session.ts"

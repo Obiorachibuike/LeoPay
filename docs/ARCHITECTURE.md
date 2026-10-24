@@ -8,11 +8,11 @@
 | Language | TypeScript strict (`noUncheckedIndexedAccess`) | Financial code benefits from exhaustiveness |
 | Styling | Tailwind CSS v4 + CSS variables | Light/dark tokens without a runtime theme library |
 | Data access | Drizzle ORM | Typed SQL, explicit transactions, no hidden lazy loading |
-| Database | PostgreSQL | `FOR UPDATE`, partial unique indexes, `SKIP LOCKED` for queues |
-| Dev/test DB | PGlite (WASM PostgreSQL) | Same SQL as production, zero external services |
+| Database | PostgreSQL 16 (`postgres.js` driver) | `FOR UPDATE`, partial unique indexes, `SKIP LOCKED` for queues |
+| Local/test database | PostgreSQL via `docker-compose.yml` (`npm run db:up`) | The app, migrations, seed and tests run on the same engine as production |
 | Validation | Zod | Shared between server actions and API routes |
 | PDF | pdf-lib | Server-generated invoices without a browser |
-| Tests | Vitest | Fast integration tests against PGlite |
+| Tests | Vitest | Integration tests against PostgreSQL (PGlite only as an opt-in fallback) |
 
 ## Layers
 

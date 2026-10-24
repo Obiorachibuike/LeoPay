@@ -51,8 +51,8 @@ Assets: customer and business data, API keys, session tokens, beneficiary bank d
 ### Secrets and configuration
 
 - `.env*` is git-ignored; `.env.example` contains placeholders only.
-- No secret is sent to the browser; only `NEXT_PUBLIC_*` values appear client-side.
-- `instrumentation.ts` refuses to start with fatal misconfiguration (weak secret, PGlite in production, mock provider in production, live provider without a key).
+- No secret is sent to the browser; only `NEXT_PUBLIC_*` values appear client-side. The database URL never leaves the server: logs print `host:port/database` only (no credentials), and the health endpoint reports the driver name alone.
+- `instrumentation.ts` refuses to start with fatal misconfiguration (weak secret, missing DATABASE_URL or the test-only PGlite driver in production, mock provider in production, live provider without a key).
 - Beneficiary account numbers are encrypted at rest with AES-256-GCM derived from `WEBHOOK_ENCRYPTION_KEY`; only the last four digits are displayed.
 - API keys and session tokens never appear in logs.
 

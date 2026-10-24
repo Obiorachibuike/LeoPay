@@ -1,0 +1,41 @@
+# Local PostgreSQL for development and tests.
+#
+#   docker compose up -d --wait db     # or: npm run db:up
+#   npm run db:migrate
+#   npm run db:seed
+#   npm run dev
+#
+# This container is for local development only: it listens on localhost and
+# accepts connections without a password, so no secret lives in the repository
+# and no credential appears in a connection string. Any deployed environment
+# must use a managed PostgreSQL instance (Neon, Supabase, RDS, Cloud SQL) with a
+# real password and TLS.
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: leopay-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-leopay}
+      POSTGRES_DB: ${POSTGRES_DB:-leopay}
+      # Local development only: trust authentication, so there is no password,
+      # no default secret and no credential in a connection string. Never run a
+      # database this way on a network you do not control; a deployed
+      # PostgreSQL must require a password and TLS.
+      POSTGRES_HOST_AUTH_METHOD: trust
+      # UTF8 so text columns behave the same as on a managed instance.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - leopay-pgdata:/var/lib/postgresql/data
+      # Creates the separate database the test suite truncates.
+      - ./db/local-init.sql:/docker-entrypoint-initdb.d/10-create-test-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-leopay} -d ${POSTGRES_DB:-leopay}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  leopay-pgdata:

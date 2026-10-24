@@ -24,8 +24,8 @@ Stated plainly, so nothing here is mistaken for production-hardened capability.
 
 ## Environment constraints
 
-- The embedded PGlite database is single-process. Do not run migrations or seeds while the dev server is open against the same directory, and never use it in production.
-- The sandbox has 2 CPUs and no external provider credentials, so verification is via the automated suite and HTTP smoke tests rather than live payment runs.
+- The application runs on PostgreSQL. The test suite uses PostgreSQL when `TEST_DATABASE_URL` is set and otherwise a per-process in-memory PGlite (WASM PostgreSQL) instance; PGlite is refused in production and is never used by the app. A suite run on the fallback exercises the same SQL but not connection pooling or concurrent-writer behaviour — run `npm run test:db` for that.
+- There are no external payment/email credentials in this environment, so verification is via the automated suite (run against PostgreSQL) and HTTP smoke tests rather than live payment runs.
 - CSP allows inline scripts (required by Next.js bootstrap); nonce-based CSP is a follow-up.
 - Merchant webhook delivery resolves DNS before each attempt but does not pin the IP for the connection.
 
