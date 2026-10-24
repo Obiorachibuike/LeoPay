@@ -14,18 +14,20 @@ A production-oriented, multi-tenant business payments platform for Nigerian busi
 | --- | --- |
 | Marketing site (home, features, solutions, pricing, security, developers, docs, about, contact, legal, status) | Implemented |
 | Authentication (register, login, email verification, password reset, invitations), sessions, rate limits | Implemented |
+| Two-factor authentication (TOTP, QR enrolment, single-use recovery codes) + workspace MFA policy for owners/admins | Implemented |
 | Multi-tenant organizations, roles (owner/admin/finance/developer/viewer), audit log | Implemented |
 | Payment links + hosted checkout + public payment page | Implemented |
 | Payments: provider initialization, server-side verification, refunds, reconciliation | Implemented |
 | Invoices: line items, tax, discounts, PDF, email, reminders, overdue tracking | Implemented |
 | Storefront, products, inventory reservations, orders | Implemented |
+| Image uploads: product photos, workspace logo, profile photo (validated, content-addressed, served from the app) | Implemented |
 | Payouts: beneficiaries, account resolution, approval threshold, separation of duties, daily limits | Implemented |
 | Transactions, analytics, CSV export, ledger, reconciliation exceptions | Implemented |
 | Developer API v1 (scoped keys, idempotency), signed merchant webhooks with retry outbox | Implemented |
 | Provider webhook receiver, scheduled job endpoint, platform admin console | Implemented |
 | Mock payment provider for local end-to-end flows (blocked in production) | Implemented, clearly labelled |
-| Live provider adapter (Paystack) | Implemented against the public API; **not tested against live credentials here** |
-| Automated tests | 56 integration/unit tests (see `docs/TESTING.md`) |
+| Live provider adapter (Paystack) | Implemented against the public API and covered by recorded-response contract tests; **not tested against live credentials here** |
+| Automated tests | 110 integration/unit/contract tests (see `docs/TESTING.md`) |
 
 Nothing in the UI is a dead button: every action calls a server action or route handler that re-authorizes, validates and persists.
 
@@ -33,13 +35,21 @@ Nothing in the UI is a dead button: every action calls a server action or route 
 
 ## Quick start
 
+Requires Node.js 20+ and PostgreSQL 14+ (developed on Node 22 and PostgreSQL 16).
+
 ```bash
 npm install
-cp .env.example .env.local     # then set AUTH_SECRET (32+ random chars)
-npm run db:migrate             # creates the schema (PGlite by default)
-npm run db:seed                # demo workspace + demo data (mock payments)
-npm run dev                    # http://localhost:3000
+cp .env.example .env.local       # then set AUTH_SECRET (32+ random chars)
+npm run db:up                    # PostgreSQL 16 in Docker (or use your own server)
+npm run db:migrate               # applies db/migrations
+npm run db:seed                  # demo workspace + demo data (mock payments)
+npm run dev                      # http://localhost:3000
 ```
+
+No Docker? Point `DATABASE_URL` in `.env.local` at any PostgreSQL instance and run the
+same `db:migrate` / `db:seed` steps. The application has no fallback database: if
+`DATABASE_URL` is missing, startup fails with an explanation rather than silently using
+an embedded engine.
 
 Demo sign-in after seeding:
 
@@ -51,16 +61,18 @@ Password: printed by `npm run db:seed` (a random value is generated per run)
 No password is committed. Set `SEED_PASSWORD` in `.env.local` before seeding if you need a
 reproducible demo password; the seed refuses to run with a production configuration.
 
-The seed refuses to run against a production configuration and only works with `PAYMENT_PROVIDER=mock`. **Stop the dev server before running `db:seed` / `db:migrate`** — the embedded PGlite engine is single-process. With a real PostgreSQL instance this restriction disappears.
+The seed refuses to run against a production configuration and only works with `PAYMENT_PROVIDER=mock`. PostgreSQL is multi-process, so migrations and seeds can run while the dev server is up (migrations are additive).
 
 Useful scripts:
 
 ```bash
 npm run typecheck    # tsc --noEmit
 npm run lint         # eslint
-npm run test         # vitest (PGlite, no external services)
+npm run test         # vitest; uses TEST_DATABASE_URL when set, else in-memory PGlite
+npm run test:db      # vitest against the local PostgreSQL test database
 npm run build        # production build
 npm run db:generate  # regenerate migrations after schema changes
+npm run db:reset     # drop the local Docker volume, recreate and migrate
 ```
 
 ### Local demo login (optional)
@@ -89,7 +101,7 @@ src/
   services/              business logic (payments, payouts, invoices, storefront, analytics…)
   db/migrations/         generated SQL migrations
 docs/                    architecture, payments, API, security, deployment, operations
-tests/                   Vitest integration tests against PGlite
+tests/                   Vitest integration tests against PostgreSQL
 ```
 
 Detailed documentation:
@@ -142,7 +154,8 @@ See [`docs/PAYMENTS.md`](docs/PAYMENTS.md) for the state machine.
 Every variable is documented in [`.env.example`](.env.example). Production safety checks (`src/lib/env.ts`, `instrumentation.ts`) refuse to start when:
 
 - `AUTH_SECRET` is missing, short or a placeholder,
-- PGlite is used with `NODE_ENV=production`,
+- `DB_DRIVER=pglite` (the test-only embedded fallback) is used with `NODE_ENV=production`,
+- `DATABASE_URL` is missing in production,
 - `PAYMENT_PROVIDER=paystack` without `PAYSTACK_SECRET_KEY`,
 - the mock provider is active in production (unless `ALLOW_MOCK_PAYMENTS=true` for a demo).
 
@@ -153,12 +166,16 @@ Non-fatal warnings (log-only email delivery, missing encryption key) are surface
 ## Tests
 
 ```bash
-npm test
+npm run db:up          # PostgreSQL 16 on localhost:5432 (creates leopay + leopay_test)
+npm test               # picks up TEST_DATABASE_URL if exported
+npm run test:db        # explicit: run the suite against the local test database
 ```
 
-56 tests cover money conversion, password hashing/tokens, payment settlement and idempotency, refunds, invoice numbering and totals, payout limits/approvals, storefront oversell protection, tenant isolation, webhook SSRF protection, rate limiting, API-key scopes, the API v1 checkout flow with idempotency, provider webhook signature rejection and ledger integrity.
+110 tests cover money conversion, password hashing/tokens, MFA (TOTP, challenges, recovery codes, workspace policy), image uploads, Paystack contract shapes, payment settlement and idempotency, refunds, invoice numbering and totals, payout limits/approvals, storefront oversell protection, tenant isolation, webhook SSRF protection, rate limiting, API-key scopes, the API v1 checkout flow with idempotency, provider webhook signature rejection and ledger integrity.
 
-There is no browser end-to-end suite in this environment (no browser runtime available); the same code paths are exercised through server-side integration tests against a real PostgreSQL-compatible engine (PGlite).
+Tests run against PostgreSQL with the real migrations applied, so `FOR UPDATE`, partial indexes, array columns and `SKIP LOCKED` behave exactly as in production. Without `TEST_DATABASE_URL` the suite falls back to PGlite (PostgreSQL compiled to WASM, in-memory) so it still runs on a machine with no server — that fallback is test-only.
+
+There is no browser end-to-end suite in this environment (no browser runtime available); the same flows are exercised through server-side integration tests and HTTP smoke tests against the running app.
 
 ---
 

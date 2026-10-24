@@ -2,6 +2,7 @@ import { authenticateApiKey } from "@/services/api-keys";
 import { apiError, jsonResponse } from "@/lib/api";
 import { toErrorResponse } from "@/lib/errors";
 import { checkRuntimeConfig } from "@/lib/env";
+import { describeDatabase } from "@/lib/db/client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,6 +24,8 @@ export async function GET(request: Request) {
         status: warnings.some((w) => w.fatal) ? "misconfigured" : "ok",
         organization: auth.organizationName,
         environment: auth.environment,
+        // Driver only: the database host is never exposed to API clients.
+        database: describeDatabase().driver,
         time: new Date().toISOString(),
       },
       warnings,

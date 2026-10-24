@@ -144,3 +144,15 @@ Payload:
 - Events are deduplicated on `(provider, event_id)`.
 - The handler re-verifies the transaction with the provider; the payload's status and amount are not trusted.
 - Invalid signatures return `401`; processing failures return `500` so the provider retries (processing is idempotent).
+
+## Image delivery (not an API endpoint)
+
+`GET /api/uploads/{organizationId}/{kind}/{sha256}.{ext}`
+
+- Serves merchant-uploaded product photos, workspace logos and profile photos.
+  Uploads themselves happen through dashboard server actions, not the public API.
+- Keys are content hashes: responses are immutable and cacheable, with the
+  content type derived from the sniffed file bytes and `X-Content-Type-Options:
+  nosniff`.
+- Unknown or malformed keys return `404`; a key never resolves outside the
+  configured `UPLOAD_DIR`.
