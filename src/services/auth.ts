@@ -112,7 +112,16 @@ export async function verifyEmailToken(token: string): Promise<void> {
   });
 }
 
-export async function login(input: { email: string; password: string; ip?: string | null }): Promise<User> {
+/**
+ * Verifies credentials. When the account has MFA enabled, **no session is
+ * created** here: the caller receives `mfaRequired` and must complete the TOTP
+ * or recovery-code challenge before a session exists.
+ */
+export async function login(input: {
+  email: string;
+  password: string;
+  ip?: string | null;
+}): Promise<{ user: User; mfaRequired: boolean }> {
   const email = input.email.toLowerCase().trim();
   const ip = input.ip ?? "unknown";
   await enforceRateLimit({ bucket: `login:${email}`, limit: 5, windowSeconds: 900 });
@@ -142,11 +151,23 @@ export async function login(input: { email: string; password: string; ip?: strin
     throw new AppError("FORBIDDEN", "This account is suspended. Contact support for assistance.");
   }
 
-  const meta = await requestMeta();
-  await createSession(user.id, meta);
   await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
   await clearRateLimit(`login:${email}`);
 
+  if (user.mfaEnabled) {
+    await audit({
+      action: "auth.login",
+      actorId: user.id,
+      actorEmail: user.email,
+      targetType: "user",
+      targetId: user.id,
+      metadata: { secondFactor: "required" },
+    });
+    return { user, mfaRequired: true };
+  }
+
+  const meta = await requestMeta();
+  await createSession(user.id, meta);
   await audit({
     action: "auth.login",
     actorId: user.id,
@@ -155,7 +176,22 @@ export async function login(input: { email: string; password: string; ip?: strin
     targetId: user.id,
   });
 
-  return user;
+  return { user, mfaRequired: false };
+}
+
+/** Called once the second factor has been verified, to open the session. */
+export async function completeLogin(user: User): Promise<void> {
+  const meta = await requestMeta();
+  await createSession(user.id, meta);
+  await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
+  await audit({
+    action: "auth.login",
+    actorId: user.id,
+    actorEmail: user.email,
+    targetType: "user",
+    targetId: user.id,
+    metadata: { secondFactor: "totp" },
+  });
 }
 
 export async function logout(): Promise<void> {
@@ -249,6 +285,14 @@ export async function resetPassword(input: { token: string; password: string }):
       data: { message: "Your LeoPay password was changed. All other sessions were signed out." },
     }).catch(() => undefined);
   }
+}
+
+/** Re-authenticates the current user for sensitive settings changes. */
+export async function assertCurrentPassword(userId: string, password: string): Promise<void> {
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!user?.passwordHash) throw new AppError("UNAUTHENTICATED", "Set a password before continuing");
+  const valid = await verifyPassword(password, user.passwordHash);
+  if (!valid) throw new AppError("VALIDATION_ERROR", "Your current password is not correct");
 }
 
 export async function changePassword(input: {

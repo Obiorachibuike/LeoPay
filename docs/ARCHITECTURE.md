@@ -8,11 +8,11 @@
 | Language | TypeScript strict (`noUncheckedIndexedAccess`) | Financial code benefits from exhaustiveness |
 | Styling | Tailwind CSS v4 + CSS variables | Light/dark tokens without a runtime theme library |
 | Data access | Drizzle ORM | Typed SQL, explicit transactions, no hidden lazy loading |
-| Database | PostgreSQL | `FOR UPDATE`, partial unique indexes, `SKIP LOCKED` for queues |
-| Dev/test DB | PGlite (WASM PostgreSQL) | Same SQL as production, zero external services |
+| Database | PostgreSQL 16 (`postgres.js` driver) | `FOR UPDATE`, partial unique indexes, `SKIP LOCKED` for queues |
+| Local/test database | PostgreSQL via `docker-compose.yml` (`npm run db:up`) | The app, migrations, seed and tests run on the same engine as production |
 | Validation | Zod | Shared between server actions and API routes |
 | PDF | pdf-lib | Server-generated invoices without a browser |
-| Tests | Vitest | Fast integration tests against PGlite |
+| Tests | Vitest | Integration tests against PostgreSQL (PGlite only as an opt-in fallback) |
 
 ## Layers
 
@@ -34,10 +34,10 @@ Rules the codebase follows:
 4. **Queues live in the database.** Emails and merchant webhooks are persisted rows; nothing important is held in memory.
 5. **Provider calls happen outside long transactions** wherever possible, and always outside `FOR UPDATE` locks.
 
-## Data model (37 tables)
+## Data model (38 tables)
 
 Identity & access
-: `users`, `sessions`, `verification_tokens`, `organizations`, `memberships`, `invitations`, `api_keys`, `rate_limits`, `audit_logs`
+: `users`, `sessions`, `verification_tokens`, `mfa_challenges`, `organizations`, `memberships`, `invitations`, `api_keys`, `rate_limits`, `audit_logs`
 
 Money in
 : `customers`, `payment_links`, `payments`, `refunds`, `invoices`, `invoice_items`, `invoice_sequences`
@@ -56,6 +56,16 @@ Reliability
 
 Operations
 : `reconciliation_runs`, `reconciliation_exceptions`, `platform_settings`, `support_tickets`, `mock_checkout_sessions` (development only)
+
+### Uploads
+
+Merchant images (product photos, workspace logos, profile photos) are written by
+`src/lib/storage.ts` to `UPLOAD_DIR` (default `.data/uploads`) under
+`<organizationId>/<kind>/<sha256>.<ext>` and served by
+`GET /api/uploads/[...key]`. Keys are content-addressed, so the same bytes are
+stored once, and the file extension comes from sniffed magic bytes rather than
+the upload's filename. Swapping in object storage means reimplementing
+`putImage`/`readImage`; callers never touch the filesystem.
 
 ### Tenancy
 

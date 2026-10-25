@@ -23,10 +23,21 @@ export const env = {
   appName: process.env.NEXT_PUBLIC_APP_NAME ?? "LeoPay",
   appUrl: resolveAppUrl(),
   databaseUrl: process.env.DATABASE_URL ?? "",
-  /** pglite = embedded Postgres (zero-install local dev / tests). postgres = real server. */
-  dbDriver:
-    (process.env.DB_DRIVER as "postgres" | "pglite" | undefined) ??
-    (process.env.DATABASE_URL ? "postgres" : "pglite"),
+  /**
+   * The application database is PostgreSQL. `pglite` (a WASM build of
+   * PostgreSQL) exists only as an explicit opt-in for test runs on machines
+   * without a server; it is refused in production.
+   */
+  dbDriver: ((): "postgres" | "pglite" => {
+    const raw = (process.env.DB_DRIVER ?? "postgres").toLowerCase();
+    if (raw !== "postgres" && raw !== "pglite") {
+      throw new Error(`DB_DRIVER must be "postgres" or "pglite" (got "${raw}")`);
+    }
+    return raw;
+  })(),
+  /** Supabase/Neon/PgBouncer-friendly pool size cap. */
+  databasePoolMax: Number(process.env.DATABASE_POOL_MAX ?? 10),
+  /** PGlite data directory — used only when DB_DRIVER=pglite. */
   pgliteDir: process.env.PGLITE_DIR ?? ".data/pglite",
   authSecret: process.env.AUTH_SECRET ?? "",
   sessionTtlDays: Number(process.env.SESSION_TTL_DAYS ?? 30),
@@ -44,6 +55,16 @@ export const env = {
   storageBucket: process.env.STORAGE_BUCKET ?? "",
   storageAccessKeyId: process.env.STORAGE_ACCESS_KEY_ID ?? "",
   storageSecretAccessKey: process.env.STORAGE_SECRET_ACCESS_KEY ?? "",
+  /**
+   * Where merchant images are written when no object-storage driver is
+   * configured. Must be a persistent volume in production.
+   */
+  uploadDir: process.env.UPLOAD_DIR ?? ".data/uploads",
+  /**
+   * Platform-wide floor: force owners/admins to enrol in MFA before they can
+   * perform sensitive actions. Organizations can opt in on their own too.
+   */
+  requireMfaForAdmins: bool(process.env.REQUIRE_MFA_FOR_ADMINS, false),
   webhookEncryptionKey: process.env.WEBHOOK_ENCRYPTION_KEY ?? "",
   logLevel: process.env.LOG_LEVEL ?? "info",
   /** Enables an in-process job ticker for webhooks/notifications (dev/single-node). */
@@ -89,16 +110,21 @@ export function checkRuntimeConfig(): RuntimeConfigProblem[] {
     problems.push({ variable: "AUTH_SECRET", message: "AUTH_SECRET looks like a placeholder value", fatal: true });
   }
 
-  if (isProduction && env.dbDriver === "pglite") {
+  if (env.dbDriver === "pglite") {
     problems.push({
-      variable: "DATABASE_URL",
-      message: "Embedded PGlite is not supported in production. Set DATABASE_URL to a managed PostgreSQL instance.",
-      fatal: true,
+      variable: "DB_DRIVER",
+      message:
+        "DB_DRIVER=pglite uses the embedded PostgreSQL build. Use it only for tests; set DATABASE_URL for a real server.",
+      fatal: isProduction,
     });
   }
 
-  if (isProduction && env.dbDriver === "postgres" && !env.databaseUrl) {
-    problems.push({ variable: "DATABASE_URL", message: "DATABASE_URL is required in production", fatal: true });
+  if (!env.databaseUrl && env.dbDriver === "postgres") {
+    problems.push({
+      variable: "DATABASE_URL",
+      message: "DATABASE_URL is required: the application runs on PostgreSQL.",
+      fatal: isProduction,
+    });
   }
 
   if (isProduction && env.paymentProvider === "mock") {
@@ -133,7 +159,20 @@ export function checkRuntimeConfig(): RuntimeConfigProblem[] {
     });
   }
 
+  if (isProduction && !pathIsAbsolute(env.uploadDir)) {
+    problems.push({
+      variable: "UPLOAD_DIR",
+      message:
+        "UPLOAD_DIR should be an absolute path on a persistent volume in production; a relative path may not survive deploys.",
+      fatal: false,
+    });
+  }
+
   return problems;
+}
+
+function pathIsAbsolute(value: string): boolean {
+  return value.startsWith("/") || /^[A-Za-z]:[\\/]/.test(value);
 }
 
 /** Throws when a fatal production misconfiguration is detected. */

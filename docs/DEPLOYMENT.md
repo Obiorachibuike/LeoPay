@@ -3,7 +3,7 @@
 ## Requirements
 
 - Node.js 20+ (developed on Node 22)
-- PostgreSQL 14+ (managed: Neon, Supabase, RDS, Cloud SQL). PGlite is **not** a production database.
+- PostgreSQL 14+ (managed: Neon, Supabase, RDS, Cloud SQL; developed against PostgreSQL 16). For local development `docker-compose.yml` starts one with `npm run db:up`.
 - A payment provider account (Paystack) to accept real payments.
 - An email provider (Resend) to deliver real email; otherwise messages are recorded but not sent.
 - An HTTPS hostname, and a scheduler that can call `POST /api/cron`.
@@ -16,8 +16,8 @@ Copy `.env.example` and set at minimum:
 | --- | --- |
 | `NODE_ENV` | `production` |
 | `NEXT_PUBLIC_APP_URL` | your HTTPS origin |
-| `DATABASE_URL` | your managed PostgreSQL connection string |
-| `DB_DRIVER` | `postgres` |
+| `DATABASE_URL` | your managed PostgreSQL connection string (add `?sslmode=require`) |
+| `DB_DRIVER` | `postgres` (the only value a deployment should use) |
 | `AUTH_SECRET` | 48 random bytes, e.g. from `openssl rand -base64 48` |
 | `WEBHOOK_ENCRYPTION_KEY` | 48 random bytes, generated the same way |
 | `PAYMENT_PROVIDER` | `paystack` |
@@ -28,6 +28,8 @@ Copy `.env.example` and set at minimum:
 | `EMAIL_API_KEY` | the API key from your email provider dashboard |
 | `JOB_RUNNER_TOKEN` | a long random value shared with your scheduler |
 | `ENABLE_INLINE_JOBS` | `false` |
+| `UPLOAD_DIR` | an absolute path on a **persistent volume** (default `.data/uploads`) |
+| `REQUIRE_MFA_FOR_ADMINS` | `true` recommended: refuse sensitive actions for owners/admins without MFA |
 
 Copy `.env.example` to `.env.local` (or your platform's environment settings) and fill in the
 values; no secret is stored in this repository.
@@ -44,6 +46,16 @@ npm run start
 ```
 
 Run migrations as a separate release step, before new instances receive traffic. Migrations are additive by convention; financial tables are never rewritten in place.
+
+### Uploads
+
+Product photos, logos and avatars are written to `UPLOAD_DIR` and served from
+`/api/uploads/...`. On a container platform the directory must be a mounted
+volume shared by every instance, otherwise an image uploaded on one node 404s on
+another. There is no object-storage driver yet; if you need S3/R2, implement
+`putImage`/`readImage` in `src/lib/storage.ts` and keep the key format. The
+directory is not served statically by Next.js, so no web-server rewrite is
+needed. Back it up together with the database: rows reference files by key.
 
 ## 3. Provider setup
 
@@ -82,4 +94,4 @@ Deploy the previous build; migrations are additive so the old code continues to 
 
 - The app is stateless; run multiple instances behind a load balancer.
 - Set `ENABLE_INLINE_JOBS=false` and use the scheduler when running more than one instance (the outbox uses `SKIP LOCKED`, so duplicates are avoided, but centralising jobs makes behaviour predictable).
-- PGlite cannot be shared between processes — local development only.
+- Run migrations as a separate release step (`npm run db:migrate`) while the pool is idle; they are additive, and instances serve traffic against both schema versions during a rolling deploy.

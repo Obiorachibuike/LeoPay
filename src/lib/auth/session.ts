@@ -9,6 +9,7 @@ import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 
 export const SESSION_COOKIE = "leopay_session";
+export const MFA_COOKIE = "leopay_mfa";
 export const ORG_COOKIE = "leopay_org";
 const SESSION_TTL_MS = env.sessionTtlDays * 24 * 60 * 60 * 1000;
 
@@ -64,6 +65,40 @@ export async function createSession(userId: string, meta?: RequestMeta): Promise
     // row still exists, only the cookie cannot be set here.
   }
   return session!.id;
+}
+
+/** Stores the short-lived MFA challenge token (HTTP-only, 10 minutes). */
+export async function setMfaChallengeCookie(token: string): Promise<void> {
+  try {
+    const store = await cookies();
+    store.set(MFA_COOKIE, token, {
+      httpOnly: true,
+      secure: env.isProduction,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 10 * 60,
+    });
+  } catch {
+    // Outside a request scope (tests): nothing to set.
+  }
+}
+
+export async function readMfaChallengeCookie(): Promise<string | undefined> {
+  try {
+    const store = await cookies();
+    return store.get(MFA_COOKIE)?.value;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function clearMfaChallengeCookie(): Promise<void> {
+  try {
+    const store = await cookies();
+    store.delete(MFA_COOKIE);
+  } catch {
+    // ignore
+  }
 }
 
 /** Reads and validates the current session. Cached per request. */

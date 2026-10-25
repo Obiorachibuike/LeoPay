@@ -1,0 +1,16 @@
+{
+  "status": true,
+  "message": "Verification successful",
+  "data": {
+    "id": 302964,
+    "status": "ongoing",
+    "reference": "LPPAY_0004",
+    "amount": 500000,
+    "currency": "NGN",
+    "channel": "ussd",
+    "fees": null,
+    "paid_at": null,
+    "gateway_response": "Ongoing",
+    "status_reason": null
+  }
+}

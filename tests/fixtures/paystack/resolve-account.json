@@ -1,0 +1,8 @@
+{
+  "status": true,
+  "message": "Account number resolved",
+  "data": {
+    "account_name": "ADA LOVELACE",
+    "account_number": "0123456789"
+  }
+}

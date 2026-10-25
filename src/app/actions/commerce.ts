@@ -6,6 +6,21 @@ import { createProduct, updateProduct, upsertStorefront, cancelOrder, createStor
 import { requirePermission } from "@/lib/auth/context";
 import { fieldErrorsApp, toErrorResponse, type ActionResult } from "@/lib/actions";
 import { productSchema, storefrontSchema, storeCheckoutSchema } from "@/lib/validation";
+import { saveUploadedImage } from "@/services/uploads";
+
+/**
+ * An inline file upload wins over the "image URL" text field: if a merchant
+ * attaches a photo we store it ourselves and ignore any pasted URL.
+ */
+async function resolveProductImage(organizationId: string, formData: FormData): Promise<string | null> {
+  const file = formData.get("imageFile");
+  if (file instanceof File && file.size > 0) {
+    const stored = await saveUploadedImage({ organizationId, kind: "product", file });
+    return stored.url;
+  }
+  const url = formData.get("imageUrl");
+  return typeof url === "string" && url.trim() ? url.trim() : null;
+}
 
 export async function saveStorefrontAction(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   try {
@@ -37,6 +52,7 @@ export async function createProductAction(_prev: ActionResult, formData: FormDat
   try {
     const ctx = await requirePermission("product:write");
     const trackInventory = formData.get("trackInventory") === "on";
+    const imageUrl = await resolveProductImage(ctx.organization.id, formData);
     const parsed = productSchema.safeParse({
       name: formData.get("name"),
       description: formData.get("description") || undefined,
@@ -46,7 +62,7 @@ export async function createProductAction(_prev: ActionResult, formData: FormDat
       trackInventory,
       inventoryQuantity: trackInventory ? Number(formData.get("inventoryQuantity") ?? 0) : 0,
       status: formData.get("status") || "draft",
-      imageUrl: formData.get("imageUrl") || null,
+      imageUrl,
     });
     if (!parsed.success) {
       return { ok: false, message: "Check the highlighted fields.", errors: fieldErrorsApp(parsed.error) };
@@ -68,6 +84,7 @@ export async function updateProductAction(productId: string, _prev: ActionResult
   try {
     const ctx = await requirePermission("product:write");
     const trackInventory = formData.get("trackInventory") === "on";
+    const imageUrl = await resolveProductImage(ctx.organization.id, formData);
     const parsed = productSchema.safeParse({
       name: formData.get("name"),
       description: formData.get("description") || undefined,
@@ -77,7 +94,7 @@ export async function updateProductAction(productId: string, _prev: ActionResult
       trackInventory,
       inventoryQuantity: trackInventory ? Number(formData.get("inventoryQuantity") ?? 0) : 0,
       status: formData.get("status") || "draft",
-      imageUrl: formData.get("imageUrl") || null,
+      imageUrl,
     });
     if (!parsed.success) {
       return { ok: false, message: "Check the highlighted fields.", errors: fieldErrorsApp(parsed.error) };

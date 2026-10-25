@@ -8,6 +8,7 @@ import {
   forgotPasswordAction,
   loginAction,
   registerAction,
+  verifyMfaLoginAction,
   resetPasswordAction,
   type FormState,
 } from "@/app/actions/auth";
@@ -53,6 +54,45 @@ export function LoginForm({ redirectTo }: { redirectTo?: string }) {
       <SubmitButton pending={pending} className="w-full">
         Sign in
       </SubmitButton>
+    </form>
+  );
+}
+
+export function MfaChallengeForm({ redirectTo }: { redirectTo?: string }) {
+  const [state, action, pending] = useActionState(verifyMfaLoginAction, initial);
+  const router = useRouter();
+
+  useEffect(() => {
+    if (state.redirectTo && !state.ok) router.push(state.redirectTo);
+  }, [state, router]);
+  useRedirect(state);
+
+  return (
+    <form action={action} className="space-y-4">
+      {state.message && !state.ok ? <Alert tone="danger">{state.message}</Alert> : null}
+      <input type="hidden" name="redirectTo" value={redirectTo ?? "/dashboard"} />
+      <Field
+        label="Authentication code"
+        htmlFor="mfa-code"
+        hint="6-digit code, or a recovery code such as abcd-efgh."
+      >
+        <Input
+          id="mfa-code"
+          name="code"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          autoFocus
+          required
+          placeholder="123456"
+          pattern="[0-9A-Za-z-]{6,20}"
+        />
+      </Field>
+      <SubmitButton pending={pending} className="w-full">
+        {pending ? "Verifying…" : "Verify and sign in"}
+      </SubmitButton>
+      <p className="text-center text-[11.5px] leading-relaxed text-muted">
+        Lost your authenticator? Use a recovery code — each one works once.
+      </p>
     </form>
   );
 }

@@ -1,0 +1,9 @@
+{
+  "status": true,
+  "message": "Transfer has been queued",
+  "data": {
+    "reference": "LPPO_0001",
+    "status": "pending",
+    "transfer_code": "TRF_example0001"
+  }
+}

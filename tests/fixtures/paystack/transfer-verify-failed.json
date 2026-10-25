@@ -1,0 +1,11 @@
+{
+  "status": true,
+  "message": "Transfer retrieved",
+  "data": {
+    "reference": "LPPO_0002",
+    "status": "failed",
+    "failures": {
+      "reason": "Insufficient balance"
+    }
+  }
+}

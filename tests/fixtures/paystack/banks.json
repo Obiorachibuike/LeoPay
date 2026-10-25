@@ -1,0 +1,14 @@
+{
+  "status": true,
+  "message": "Banks retrieved",
+  "data": [
+    {
+      "code": "058",
+      "name": "Guaranty Trust Bank"
+    },
+    {
+      "code": "044",
+      "name": "Access Bank"
+    }
+  ]
+}

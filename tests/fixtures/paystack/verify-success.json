@@ -1,0 +1,19 @@
+{
+  "status": true,
+  "message": "Verification successful",
+  "data": {
+    "id": 302961,
+    "status": "success",
+    "reference": "LPPAY_0001",
+    "amount": 500000,
+    "currency": "NGN",
+    "channel": "card",
+    "fees": 7500,
+    "paid_at": "2026-02-11T09:31:07.000Z",
+    "gateway_response": "Successful",
+    "status_reason": null,
+    "customer": {
+      "email": "buyer@example.test"
+    }
+  }
+}
